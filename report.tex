@@ -1,0 +1,144 @@
+\documentclass{article}
+
+% if you need to pass options to natbib, use, e.g.:
+%     \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading neurips_2024
+
+
+% ready for submission
+% \usepackage{neurips_2024}
+
+
+% to compile a preprint version, e.g., for submission to arXiv, add add the
+% [preprint] option:
+    \usepackage[preprint]{neurips_2024}
+
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+%     \usepackage[final]{neurips_2024}
+
+
+% to avoid loading the natbib package, add option nonatbib:
+%    \usepackage[nonatbib]{neurips_2024}
+
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+
+
+\title{Obesity Prediction based on lifestyle and demographic factors - Milestone 2}
+
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+
+
+\author{
+  Weiqi Zhou\\
+  UC San Diego\\
+  \texttt{wez092@ucsd.edu} \\
+  % examples of more authors
+   \And
+  Feiyang Jiang \\
+  UC San Diego \\
+  \texttt{fejiang@ucsd.edu} \\
+   \AND
+  Junhan Chen \\
+  UC San Diego \\
+  \texttt{juc102@ucsd.edu} \\
+  \And
+  Fanyuanhang Zhang \\
+  UC San Diego \\
+  \texttt{faz007@ucsd.edu} \\
+  \And
+  Yiqian Liu \\
+  UC San Diego \\
+  \texttt{yil381@ucsd.edu} \\
+}
+
+
+\begin{document}
+\maketitle
+
+
+% \begin{abstract}
+%   The purpose of this project is to study prediction of obesity level from observed demographic and lifestyle features using Bayesian Network inference and learning. 
+% \end{abstract}
+
+
+\section{Problem Description and Motivation}
+
+
+We study the problem of predicting an individual’s obesity category using demographic and lifestyle features. Obesity is a major public-health concern linked to increased risk of chronic diseases and reduced quality of life. Risk factors such as diet, physical activity, sedentary behavior, and family history interact in complex, probabilistic ways rather than simple linear relationships. Our goal is to build a probabilistic model that can not only predict obesity class, but also reveal how different factors contribute to obesity risk and support “what-if” reasoning (e.g., how changes in activity level affect risk).
+
+\section{Data Sourcing and Processing}
+\subsection{Dataset Description}
+For our study, we will be using the dataset - "Dataset for estimation of obesity levels based on eating habits and physical condition in individuals from Colombia, Peru and Mexico"\citep{obesity_dataset}. 
+
+This dataset include data for the estimation of obesity levels in individuals from the countries of Mexico, Peru and Colombia, based on their eating habits and physical condition.
+The data contains 17 attributes and 2111 records, the records are labeled with the class variable NObesity (Obesity Level), that allows classification of the data using the values of Insufficient Weight, Normal Weight, Overweight Level I, Overweight Level II, Obesity Type I, Obesity Type II and Obesity Type III.
+
+\subsection{Data Processing}
+Before proceeding to build the Bayesian network, we applied several pre-processing steps to turn the dataset into a format that's more compatible with discrete probabilistic modeling. Because we need to have all variable be discrete in the Bayesian network model, we transformed the continuous features in the dataset into small, interpretable bins with different levels and categories. The specific transformations are as follows for the features that we decided to use for our project:
+\begin{itemize}
+    \item 
+\end{itemize}
+% For example, we discretize age into categories such as “young,” “middle,” and “older adult,” and we convert continuous measures like water intake or physical activity frequency into low/medium/high bins. We apply simple quantile-based binning for variables without clear domain thresholds, and domain-motivated cutoffs where meaningful (e.g., for BMI).
+
+We then review categorical variables for consistency. Some lifestyle variables (e.g., FAVC, CAEC, CALC) contain multiple categorical levels that collapse naturally into broader behavioral groups. To keep conditional probability tables manageable, we standardize these categories and unify rare levels.
+
+Finally, we identify and remove redundant or non-informative features. Since BMI is both available and highly correlated with the final obesity class, we convert it into a discretized intermediate node (BMI_bin) rather than leaving it continuous. This step is important because BMI acts as a natural causal mediator in the network and helps reduce the complexity of CPTs for the final prediction node.
+
+These processing steps make the dataset compatible with the assumptions of a discrete Bayesian network, help control CPT size, and preserve interpretability in the final model.
+
+\section{Modeling and Inference}
+\subsection{Overall Idea}
+We use a Bayesian network to model the joint distribution of demographic, diet, and lifestyle variables together with an intermediate BMI node and the final obesity class. All continuous features (e.g., age, BMI, physical activity level, screen time, water intake) will be discretized into a small number of bins (such as low/medium/high) so that all variables are discrete and the conditional probability tables (CPTs) remain manageable.
+
+\subsection{Variables in the Belief Network}
+We will include the following features from the dataset as variables in the belief network:
+\begin{itemize}
+    \item Demographic \& family history: Gender, Age\_bin, family\_history
+    \item Diet-Related Factors: FAVC (high-calorie food frequency), FCVC (vegetable intake), NCP (meals per day), CAEC (snacking), CH20\_bin (water intake)
+    \item Lifestyle / Activity: SMOKE, FRAF\_bin (physical activity), TUE\_bin (screen time), CALC (alcohol), MTRANS (transport mode)
+    \item Intermediate Node: BMI\_bin
+    \item Outcome: Obesity
+
+\end{itemize}
+
+\subsection{Domain-Informed Structure}
+We will construct the structure of BN based on domain knowledge of dependencies among selected variables. Specifically, the structure flow will be:
+\begin{itemize}
+    \item Demographic and family history $\to$ Lifestyle and dietary traits: due to (1) Age and gender influence activity pattern, calorie intake, and eating routine; and (2) Family history affects both BMI and lifestyle behaviors
+    \item Lifestyle and diet $\to$ BMI\_bin: due to eating habits (FAVC, FCVC, NCP, CAEC, CH2O\_bin) and lifestyle variables (FAF\_bin, TUE\_bin, SMOKE, CALC, MTRANS) influence body mass.
+    \item BMI\_bin $\to$ Obesity: due to BMI serves as an intermediate physiological indicator directly determining the final obesity class.
+\end{itemize}
+To avoid unmanageably large CPTs, we will cap the number of parents per node. When multiple variables influence BMI, we will optionally introduce a Lifestyle\_Index node that aggregates major behaviors (e.g., physical activity, screen time, calorie frequency) into a discretized summary variable. This reduces the number of parents for BMI\_bin while preserving model interpretability.
+
+\subsection{Parameter Learning and Inference}
+For parameter learning, we plan to use maximum likelihood estimation to obtain stable conditional probability tables once the network structure has been determined from the previous step. Since our dataset is complete and fully observed, MLE allows us to directly estimate these probabilities from the data without relying on iterative procedures like EM. After the CPTs are learned, we will perform inference on the network using different inference methods for comparison of result: exact inference with variable elimination, and approximate inference methods like Markov Chain Monte Carlo. For prediction step, we will compute $P(Obesity|features)$ and select the most likely obesity category as the model’s output. After prediction on the test set, we will assess the performance of the model through metrics like accuracy, F1-score, etc. In addition to performance evaluation, we will run several “what-if’’ queries (ex. adjusting activity level or caloric intake) to highlight the interpretability benefits of using a Bayesian network and to better understand how specific lifestyle factors influence obesity risk.
+
+\section{Results and Discussion}
+
+\section{Conclusion}
+
+\section{Reflections and Contributions}
+
+
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}
