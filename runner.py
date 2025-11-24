@@ -10,35 +10,43 @@ from sklearn.metrics import accuracy_score, f1_score
 # ==========================================
 # 1. PREPROCESSING & DISCRETIZATION [cite: 67, 68]
 # ==========================================
+# ==========================================
+# 1. PREPROCESSING & DISCRETIZATION (UPDATED)
+# ==========================================
 def load_and_process_data(filepath):
     df = pd.read_csv(filepath)
 
-    # Example: Discretize BMI into BMI_bin (Intermediate Node) [cite: 32, 73]
-    # You can use pd.cut for domain thresholds or pd.qcut for quantiles
-    # Adjust bins=[0, 18.5, 25, 30, 100] for Underweight, Normal, Overweight, Obese
-    df['BMI_bin'] = pd.cut(df['BMI'], bins=4, labels=['Low', 'Normal', 'High', 'VeryHigh'])
+    # ---------------------------------------------------------
+    # NEW STEP: Calculate BMI
+    # Formula: BMI = Weight (kg) / Height (m)^2
+    # NOTE: Ensure your dataset's 'Height' is in meters (e.g., 1.75).
+    # If it is in cm (e.g., 175), divide by 100 first.
+    # ---------------------------------------------------------
+    df['BMI'] = df['Weight'] / (df['Height'] ** 2)
 
-    # Example: Discretize Age into Age_bin [cite: 28]
+    # Example: Discretize BMI into BMI_bin (Intermediate Node)
+    # Using standard WHO categories: Underweight (<18.5), Normal (18.5-24.9), Overweight (25-29.9), Obese (>30)
+    # We use a large upper bound (100) to catch everything above 30
+    df['BMI_bin'] = pd.cut(df['BMI'], bins=[0, 18.5, 25, 30, 100],
+                           labels=['Underweight', 'Normal', 'Overweight', 'Obese'])
+
+    # Example: Discretize Age into Age_bin
     df['Age_bin'] = pd.qcut(df['Age'], q=3, labels=['Young', 'Middle', 'Senior'])
 
-    # Example: Discretize Physical Activity (FAF) [cite: 31]
-    df['FAF_bin'] = pd.cut(df['FAF'], bins=3, labels=['Low', 'Medium', 'High'])
+    # Example: Discretize Physical Activity (FAF)
+    # Assuming FAF is 0-3 days/frequency
+    df['FAF_bin'] = pd.cut(df['FAF'], bins=[-0.1, 1, 2, 4], labels=['Low', 'Medium', 'High'])
 
     # Ensure all columns used in the BN are strings/categories (Discrete)
     cols_to_use = [
-        'Gender', 'Age_bin', 'family_history_with_overweight',  # Demographics
+        'Gender', 'Age_bin', 'family_history',  # Demographics
         'FAVC', 'FCVC', 'NCP', 'CAEC', 'SMOKE', 'FAF_bin', 'TUE', 'CALC', 'MTRANS',  # Lifestyle
-        'BMI_bin', 'NObesity'  # Intermediate & Target
+        'BMI_bin', 'Obesity'  # Intermediate & Target
     ]
 
     # Filter and convert to string to ensure discrete treatment by pgmpy
     data = df[cols_to_use].astype(str)
 
-    # Rename 'family_history_with_overweight' to 'family_history' for brevity [cite: 28]
-    data = data.rename(columns={
-        'family_history_with_overweight': 'family_history',
-        'NObesity': 'Obesity'
-    })
 
     return data
 
@@ -132,7 +140,7 @@ def run_what_if_analysis(model):
 # ==========================================
 if __name__ == "__main__":
     # 1. Load Data
-    # df = load_and_process_data('ObesityDataSet_raw_and_data_sinthetic.csv')
+    df = load_and_process_data('Obesity_prediction.csv')
 
     # 2. Split Data
     # train, test = train_test_split(df, test_size=0.2, random_state=42)
