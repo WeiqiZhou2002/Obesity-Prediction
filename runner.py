@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from pgmpy.models import BayesianNetwork
+from pgmpy.models import DiscreteBayesianNetwork
 from pgmpy.estimators import MaximumLikelihoodEstimator
 from pgmpy.inference import VariableElimination
 from sklearn.model_selection import train_test_split
@@ -56,28 +56,31 @@ def load_and_process_data(filepath):
 # ==========================================
 def build_and_train_model(train_data):
     # Define the structure based on your Domain-Informed Structure section
-    #     model = BayesianNetwork([
-    # 1. Demographics/History -> Lifestyle & Diet [cite: 37]
-    ('Gender', 'FAF_bin'),
-    ('Age_bin', 'FAVC'),  # Example connection
-    ('family_history', 'BMI_bin'),  # History affects BMI [cite: 38]
+    model = DiscreteBayesianNetwork([
+        # 1. Demographics/History -> Lifestyle & Diet [cite: 37]
+        ('Gender', 'FAF_bin'),
+        ('Age_bin', 'FAVC'),  # Example connection
+        ('family_history', 'BMI_bin'),  # History affects BMI [cite: 38]
 
-    # 2. Lifestyle/Diet -> BMI_bin [cite: 39]
-    ('FAVC', 'BMI_bin'),
-    ('FAF_bin', 'BMI_bin'),
-    ('SMOKE', 'BMI_bin'),
+        # 2. Lifestyle/Diet -> BMI_bin [cite: 39]
+        ('FAVC', 'BMI_bin'),
+        ('FAF_bin', 'BMI_bin'),
+        ('SMOKE', 'BMI_bin'),
 
-    # 3. BMI_bin -> Obesity (Target) [cite: 40, 81]
-    ('BMI_bin', 'Obesity')
+        # 3. BMI_bin -> Obesity (Target) [cite: 40, 81]
+        ('BMI_bin', 'Obesity')
 
-    # ])
+    ])
 
 # Parameter Learning using MLE
 # Since data is complete/fully observed, we do not need EM.
-# print("Learning CPTs using MLE...")
-# model.fit(train_data, estimator=MaximumLikelihoodEstimator)
-#
-# return model
+    print("Structure defined. Learning CPTs using MLE...")
+    model.fit(train_data, estimator=MaximumLikelihoodEstimator)
+
+    # # Optional: Check if the model is valid (no cycles, everything connected)
+    # print(f"Model Check: {model.check_model()}")
+
+    return model
 
 
 # ==========================================
@@ -143,14 +146,14 @@ if __name__ == "__main__":
     df = load_and_process_data('Obesity_prediction.csv')
 
     # 2. Split Data
-    # train, test = train_test_split(df, test_size=0.2, random_state=42)
+    train, test = train_test_split(df, test_size=0.2, random_state=42)
 
     # 3. Train
-    # model = build_and_train_model(train)
+    model = build_and_train_model(train)
 
     # 4. Evaluate
-    # evaluate_model(model, test)
+    evaluate_model(model, test)
 
     # 5. Interpret
-    # run_what_if_analysis(model)
+    run_what_if_analysis(model)
     pass
