@@ -31,6 +31,7 @@
 \usepackage{nicefrac}       % compact symbols for 1/2, etc.
 \usepackage{microtype}      % microtypography
 \usepackage{xcolor}         % colors
+\usepackage{amsmath}
 
 
 \title{Obesity Prediction based on lifestyle and demographic factors - Milestone 2}
@@ -74,7 +75,7 @@
 
 
 % \begin{abstract}
-%   The purpose of this project is to study prediction of obesity level from observed demographic and lifestyle features using Bayesian Network inference and learning. 
+%   The purpose of this project is to study prediction of obesity level from observed demographic and lifestyle features using Bayesian Network inference and learning.
 % \end{abstract}
 
 
@@ -85,57 +86,258 @@ We study the problem of predicting an individual’s obesity category using demo
 
 \section{Data Sourcing and Processing}
 \subsection{Dataset Description}
-For our study, we will be using the dataset - "Dataset for estimation of obesity levels based on eating habits and physical condition in individuals from Colombia, Peru and Mexico"\citep{obesity_dataset}. 
+For our study, we will be using the dataset - "Dataset for estimation of obesity levels based on eating habits and physical condition in individuals from Colombia, Peru and Mexico"\citep{obesity_dataset}.
 
 This dataset include data for the estimation of obesity levels in individuals from the countries of Mexico, Peru and Colombia, based on their eating habits and physical condition.
 The data contains 17 attributes and 2111 records, the records are labeled with the class variable NObesity (Obesity Level), that allows classification of the data using the values of Insufficient Weight, Normal Weight, Overweight Level I, Overweight Level II, Obesity Type I, Obesity Type II and Obesity Type III.
 
 \subsection{Data Processing}
-Before proceeding to build the Bayesian network, we applied several pre-processing steps to turn the dataset into a format that's more compatible with discrete probabilistic modeling. Because we need to have all variable be discrete in the Bayesian network model, we transformed the continuous features in the dataset into small, interpretable bins with different levels and categories. The specific transformations are as follows for the features that we decided to use for our project:
+Before proceeding to build the Bayesian network, we applied several pre-processing steps to turn the dataset into a format compatible with discrete probabilistic modeling. Since Bayesian networks require discrete variables to manage Conditional Probability Table (CPT) sizes effectively, we transformed the continuous features into small, interpretable bins. The specific transformations for the selected features are as follows:
+
 \begin{itemize}
-    \item 
+    \item \textbf{Body Mass Index (BMI):} This variable is calculated first using $\text{BMI} = \frac{\text{Weight (kg)}}{\text{Height (m)}^2}$, then discretized into four categories based on World Health Organization standards: \textit{Underweight} (BMI $< 18.5$), \textit{Normal} ($18.5 \leq$ BMI $< 25$), \textit{Overweight} ($25 \leq$ BMI $< 30$), and \textit{Obese} (BMI $\geq 30$).
+
+    \item \textbf{Age (Age\_bin):} We discretized age into three categories (\textit{Young}, \textit{Middle}, and \textit{Senior}) using a quantile-based binning method. This ensures a balanced representation across different age groups and helps capture age-related lifestyle and metabolic differences.
+
+    \item \textbf{Physical Activity Frequency (FAF\_bin):} We transformed the continuous physical activity frequency variable (measured in days per week) into three levels: \textit{Low} (0-1 days), \textit{Medium} (1-2 days), and \textit{High} ($>$2 days). These thresholds reflect common physical activity recommendations.
+
+    \item \textbf{Vegetable Consumption Frequency (FCVC):} We rounded the continuous values to the nearest integer to create discrete categories (1, 2, 3), representing low to high vegetable intake frequency.
+
+    \item \textbf{Number of Main Meals (NCP):} Similar to FCVC, we rounded the number of main meals per day to discrete integer values (1, 2, 3, 4) to capture distinct eating patterns.
+
+    \item \textbf{Technology Usage Time (TUE):} We rounded screen time values to integers (0, 1, 2), representing hours spent using electronic devices, which serves as a proxy for sedentary behavior.
+
+    \item \textbf{Water Consumption (CH2O\_bin):} We discretized daily water intake by rounding to integer categories (1, 2, 3), representing approximate liters of water consumed per day.
 \end{itemize}
-% For example, we discretize age into categories such as “young,” “middle,” and “older adult,” and we convert continuous measures like water intake or physical activity frequency into low/medium/high bins. We apply simple quantile-based binning for variables without clear domain thresholds, and domain-motivated cutoffs where meaningful (e.g., for BMI).
 
-We then review categorical variables for consistency. Some lifestyle variables (e.g., FAVC, CAEC, CALC) contain multiple categorical levels that collapse naturally into broader behavioral groups. To keep conditional probability tables manageable, we standardize these categories and unify rare levels.
+In addition to these transformed variables, we incorporated existing categorical features into the Bayesian network. We treated these as nominal discrete states without ordinal mapping to preserve their semantic meaning during inference:
 
-Finally, we identify and remove redundant or non-informative features. Since BMI is both available and highly correlated with the final obesity class, we convert it into a discretized intermediate node (BMI_bin) rather than leaving it continuous. This step is important because BMI acts as a natural causal mediator in the network and helps reduce the complexity of CPTs for the final prediction node.
-
-These processing steps make the dataset compatible with the assumptions of a discrete Bayesian network, help control CPT size, and preserve interpretability in the final model.
+\begin{enumerate}
+    \item \textbf{Binary Variables:} Gender, Family History with Overweight (family\_history), Frequent Consumption of High-Calorie Food (FAVC), Smoking Status (SMOKE).
+    \item \textbf{Multi-class Categorical Variables:} Consumption of Food Between Meals (CAEC), Consumption of Alcohol (CALC), Mode of Transportation (MTRANS).
+\end{enumerate}
 
 \section{Modeling and Inference}
-\subsection{Overall Idea}
-We use a Bayesian network to model the joint distribution of demographic, diet, and lifestyle variables together with an intermediate BMI node and the final obesity class. All continuous features (e.g., age, BMI, physical activity level, screen time, water intake) will be discretized into a small number of bins (such as low/medium/high) so that all variables are discrete and the conditional probability tables (CPTs) remain manageable.
+\subsection{Choice of Probabilistic Model}
+We model the joint distribution over demographic, dietary, lifestyle, and physiological variables using a discrete Bayesian Network (BN). In this network, each node corresponds to a feature (e.g., Age, physical activity, snacking behavior, BMI, etc.), and directed edges encode conditional dependencies suggested by domain knowledge about obesity.
 
-\subsection{Variables in the Belief Network}
-We will include the following features from the dataset as variables in the belief network:
+The BN is particularly suitable for this problem because:
+
 \begin{itemize}
-    \item Demographic \& family history: Gender, Age\_bin, family\_history
-    \item Diet-Related Factors: FAVC (high-calorie food frequency), FCVC (vegetable intake), NCP (meals per day), CAEC (snacking), CH20\_bin (water intake)
-    \item Lifestyle / Activity: SMOKE, FRAF\_bin (physical activity), TUE\_bin (screen time), CALC (alcohol), MTRANS (transport mode)
-    \item Intermediate Node: BMI\_bin
-    \item Outcome: Obesity
-
+    \item It can represent multi-step causal pathways, such as
+    demographic factors \(\rightarrow\) behaviors \(\rightarrow\) BMI \(\rightarrow\) obesity.
+    \item It supports both supervised prediction (predicting obesity class given observed features) and interpretable “what-if” queries, where we change a behavior and examine how the obesity risk distribution shifts.
 \end{itemize}
 
-\subsection{Domain-Informed Structure}
-We will construct the structure of BN based on domain knowledge of dependencies among selected variables. Specifically, the structure flow will be:
-\begin{itemize}
-    \item Demographic and family history $\to$ Lifestyle and dietary traits: due to (1) Age and gender influence activity pattern, calorie intake, and eating routine; and (2) Family history affects both BMI and lifestyle behaviors
-    \item Lifestyle and diet $\to$ BMI\_bin: due to eating habits (FAVC, FCVC, NCP, CAEC, CH2O\_bin) and lifestyle variables (FAF\_bin, TUE\_bin, SMOKE, CALC, MTRANS) influence body mass.
-    \item BMI\_bin $\to$ Obesity: due to BMI serves as an intermediate physiological indicator directly determining the final obesity class.
-\end{itemize}
-To avoid unmanageably large CPTs, we will cap the number of parents per node. When multiple variables influence BMI, we will optionally introduce a Lifestyle\_Index node that aggregates major behaviors (e.g., physical activity, screen time, calorie frequency) into a discretized summary variable. This reduces the number of parents for BMI\_bin while preserving model interpretability.
+All variables are treated as discrete so that the conditional probability tables (CPTs) are well-defined and can be estimated directly from data using maximum likelihood.
 
-\subsection{Parameter Learning and Inference}
-For parameter learning, we plan to use maximum likelihood estimation to obtain stable conditional probability tables once the network structure has been determined from the previous step. Since our dataset is complete and fully observed, MLE allows us to directly estimate these probabilities from the data without relying on iterative procedures like EM. After the CPTs are learned, we will perform inference on the network using different inference methods for comparison of result: exact inference with variable elimination, and approximate inference methods like Markov Chain Monte Carlo. For prediction step, we will compute $P(Obesity|features)$ and select the most likely obesity category as the model’s output. After prediction on the test set, we will assess the performance of the model through metrics like accuracy, F1-score, etc. In addition to performance evaluation, we will run several “what-if’’ queries (ex. adjusting activity level or caloric intake) to highlight the interpretability benefits of using a Bayesian network and to better understand how specific lifestyle factors influence obesity risk.
+\subsection{Network Variables}
+Based on the preprocessing steps described in Section 2, our Bayesian Network consists of the following discrete nodes. We treat all variables as categorical states (e.g., "High", "Low") to facilitate probabilistic inference:
+
+\begin{itemize}
+    \item \textbf{Demographics:} \texttt{Gender}, \texttt{Age\_bin} (Young/Middle/Senior), and \texttt{family\_history}.
+    \item \textbf{Dietary Habits:}
+    \begin{itemize}
+        \item \texttt{FAVC}: Frequent consumption of high-calorie food.
+        \item \texttt{FCVC}: Frequency of vegetable consumption.
+        \item \texttt{NCP}: Number of main meals.
+        \item \texttt{CAEC}: Consumption of food between meals.
+        \item \texttt{CH2O\_bin}: Daily water intake.
+    \end{itemize}
+    \item \textbf{Lifestyle:}
+    \begin{itemize}
+        \item \texttt{SMOKE}: Smoking status.
+        \item \texttt{FAF\_bin}: Physical activity frequency.
+        \item \texttt{TUE\_bin}: Time using technology devices.
+        \item \texttt{CALC}: Alcohol consumption frequency.
+        \item \texttt{MTRANS}: Transportation mode.
+    \end{itemize}
+    \item \textbf{Intermediate Node:} \texttt{BMI\_bin} (Underweight, Normal, Overweight, Obese).
+    \item \textbf{Target:} \texttt{Obesity} (The final obesity classification).
+\end{itemize}
+
+\subsection{Network Structure and Conditional Independence Assumptions}
+The directed structure of the Bayesian network is hand-crafted based on domain knowledge about how obesity develops, and implemented as a DiscreteBayesianNetwork in pgmpy. The main dependency structure is:
+\begin{itemize}
+    \item Demographic and family history $\to$ lifestyle/diet behavior:
+        \begin{itemize}
+            \item Gender $\to$ FAF\_bin, Gender $\to$ FAVC
+            \item Age\_bin $\to$ FAF\_bin, Age\_bin $\to$ FAVC
+        \end{itemize}
+    Assumption: age and gender influence both physical activity and high-calorie food consumption (e.g., younger individuals or certain gender groups may have different activity patterns and dietary habits).
+    \item Family history, diet, and lifestyle $\to$ BMI:\\
+    Parents of BMI\_bin:
+        \begin{itemize}
+            \item family\_history
+            \item Diet: FAVC, FCVC, NCP, CAEC, (optionally CH2O\_bin)
+            \item Lifestyle: FAF\_bin, TUE\_bin (or TUE), SMOKE, CALC, MTRANS
+        \end{itemize}
+    Assumption: BMI acts as a physiological summary of long-term energy balance, which is influenced by both genetic predisposition (family\_history) and a range of diet and activity behaviors.
+    \item BMI $\to$ Obesity:
+        \begin{itemize}
+            \item BMI\_bin $\to$ Obesity
+        \end{itemize}
+    Here we assume that once BMI is known, Obesity depends only on BMI and is conditionally independent of individual diet/lifestyle variables. In other words, BMI is the main mediator between behaviors/genetics and the final diagnosed obesity class.
+\end{itemize}
+
+This structure is acyclic and roughly layered:
+
+\begin{quote}
+Demographics, family history $\rightarrow$ Diet \& lifestyle $\rightarrow$ BMI $\rightarrow$ Obesity.
+\end{quote}
+
+The conditional independence encoded by the BN can be summarized as:
+\begin{itemize}
+    \item Each node is conditionally independent of its non-descendants given its parents.
+    \item In particular, $\text{Obesity} \perp\!\!\!\perp \{ \text{FAVC}, \text{FCVC}, \text{FAF\_bin}, \ldots \} \mid \text{BMI\_bin}$, meaning that, for prediction, the detailed behavior variables affect obesity only through their impact on BMI.
+\end{itemize}
+
+
+\subsection{Parameter Learning (Maximum Likelihood Estimation)}
+Once the network structure is specified, we learn all CPT parameters from the training portion of the dataset using \textbf{Maximum Likelihood Estimation (MLE)} via pgmpy's MaximumLikelihoodEstimator:
+
+\begin{verbatim}
+model.fit(train, estimator=MaximumLikelihoodEstimator)
+\end{verbatim}
+
+\noindent For each node $X$ with parents $\mathrm{Pa}(X)$, the CPT entries are estimated by:
+\[
+\hat{P}(X = x \mid \mathrm{Pa}(X) = \mathbf{u})
+    = \frac{\operatorname{count}(X = x,\, \mathrm{Pa}(X) = \mathbf{u})}
+           {\operatorname{count}(\mathrm{Pa}(X) = \mathbf{u})}.
+\]
+
+\noindent Because the dataset is complete and fully observed (no missing values for the variables we use), there is no need for EM or other latent-variable learning algorithms. The counts are computed directly from the training data, and \texttt{pgmpy} internally builds the CPT tables for each node.\\
+
+\noindent All variables are discrete, so parameter learning reduces to computing normalized frequency tables for every parent configuration. This provides a straightforward mapping from data frequencies to probability parameters.
+
+\subsection{Inference, Prediction, and Evaluation}
+After learning the BN parameters, we perform exact inference using pgmpy’s VariableElimination algorithm:
+
+\begin{verbatim}
+inference = VariableElimination(model)
+\end{verbatim}
+
+\noindent For each test instance:
+    \begin{enumerate}
+        \item We treat all non-target variables in that row (e.g., Gender, Age\_bin, FAF\_bin, FAVC, ..., BMI\_bin) as evidence.
+        \item We query the network for the most probable obesity class:
+            \begin{verbatim}
+                result = inference.map_query(
+                    variables=['Obesity'],
+                    evidence=evidence_dict,
+                    show_progress=False
+                )
+            \end{verbatim}
+            This computes:
+            \[
+            \hat{y} = \arg\max_{o}\; P(\text{Obesity} = o \mid \text{evidence}),
+            \]
+            which is used as the predicted class for that individual.
+        \item We collect the predictions for all test rows and compare them to the true Obesity labels.
+
+        For performance evaluation, we compute:
+        \begin{itemize}
+            \item Accuracy: fraction of correctly predicted obesity classes.
+            \item Weighted F1-score: F1 averaged across classes, weighted by support (number of instances per class). This is important because obesity categories can be imbalanced, and we want a metric that reflects performance across all classes.
+\begin{verbatim}
+    acc = accuracy_score(y_true, y_pred)
+    f1  = f1_score(y_true, y_pred, average='weighted')
+\end{verbatim}
+        \end{itemize}
+    \end{enumerate}
+
+\noindent This gives a quantitative measure of how well the BN captures the relationship between features and obesity.
+
+\subsection{What-If Analysis and Interpretability}
+
+Beyond point predictions, we use the BN to perform what-if analyses that highlight its interpretability. For example, we compare:
+
+\[P(Obesity \mid FAF\_bin = High) \textbf{ } vs. P(Obesity \mid FAF\_bin = Low)\]
+
+\noindent using:
+\begin{verbatim}
+    q_high_activity = infer.query(
+        variables=['Obesity'],
+        evidence={'FAF_bin': 'High'}
+    )
+    q_low_activity = infer.query(
+        variables=['Obesity'],
+        evidence={'FAF_bin': 'Low'}
+    )
+\end{verbatim}
+
+Here we either leave other variables marginal or fix additional evidence as needed. Comparing the resulting probability distributions shows how increasing physical activity shifts the predicted obesity risk distribution, even without retraining the model.
+
+Similar queries can be run for caloric intake, snacking, or alcohol consumption. These “what-if” scenarios demonstrate one of the key advantages of using a Bayesian network for this problem: it provides both predictive performance and transparent, probabilistic explanations of how specific lifestyle factors influence obesity risk.
 
 \section{Results and Discussion}
 
+\subsection{Quantitative Metrics Performance}
+We evaluated our Bayesian Network on a splited test set consists of 20\% of the original dataset. The model achieved the following performance metrics:
+
+\begin{itemize}
+    \item \textbf{Accuracy:} 57.21\%
+    \item \textbf{Weighted F1-Score:} 0.4491
+\end{itemize}
+
+Since the target variable Obesity \texttt{Obesity} has 7 distinct classes, a purly random classifier would only obtain an accuracy of approximately 14.3\%. So from this point of view, our model's accuracy of 57.21\% indicates that the bayesian network model we've built has successfully captured significant dependencies between lifestyle factors, BMI, and obesity levels, despite it's still not highly accurate.
+
+However, the moderate F1-score suggests some difficulty in distinguishing between adjacent classes (like distinguishing \textit{Overweight Level I} from \textit{Overweight Level II}). This is likely due to the fact that we turned continuous variables (such as BMI and Age) into discrete categories with only a few thresholds, which could leads to a loss of fine-grained information, therefore making the prediction close but not highly accurate in adjacent classes.
+
+\subsection{Qualitative Analysis}
+Aside from pure metric assessment of model's quality, to test the interpretability of our model and its practicality in real-world scenario, we performed some "what-if" case queries to observe how changes in specific lifestyle nodes affect the probability distribution of the outcome, then analyze the quality of our model.
+
+To illustrate, one example of such queries we've performed is to test the effect of physical activity on obesity risk. To do so, we queried $P(\text{Obesity} \mid \text{FAF\_bin} = \text{High})$ versus $P(\text{Obesity} \mid \text{FAF\_bin} = \text{Low})$. The results align with domain knowledge:
+
+\begin{itemize}
+    \item \textbf{High Activity Scenario:} The most likely outcome is \textit{Normal Weight} ($23.1\%$). The probability of severe obesity (Type II and III combined) is relatively low ($\approx 13.9\%$).
+    \item \textbf{Low Activity Scenario:} The probability mass shifts significantly toward higher weight classes. The probability of \textit{Obesity Type I, II,} and \textit{III} increases notably compared to the high activity scenario. For instance, the probability of \textit{Obesity Type I} nearly doubles from 7.7\% (High Activity) to 13.6\% (Low Activity).
+\end{itemize}
+
+These results confirm that the model correctly learned the causal influence of physical activity on body mass, validatng our structure where \texttt{FAF\_bin} $\to$ \texttt{BMI\_bin} $\to$ \texttt{Obesity}.
+
+\subsection{Discussion and Limitations}
+While the model captures the general trends correctly, the prediction accuracy is limited by several factors shown below:
+
+\begin{enumerate}
+    \item \textbf{Information Loss via Discretization:} To make the Bayesian Network computationally feasible, we have to discretized continuous variables like \texttt{BMI} and \texttt{NCP} into coarse bins so that it can take discrete values. This inevitably cause us to lose information on precise data points that might distinguish between adjacent obesity classes around boarderlines.
+    \item \textbf{Structural Assumptions:} Our "Intermediate Node" structure design assumes that lifestyle factors influence Obesity \textit{only} through BMI. However, in reality, factors like high caloric intake or smoking might have direct physiological effects on obesity classification independent of the simple BMI calculation (like muscle mass vs. fat distribution). Therefore, this inaccuracy / oversimplification of the structure might hurt the model's performance.
+    \item \textbf{Data Quality:} The dataset includes synthetic records to balance classes, which may introduce noise or unrealistic combinations of features that confuse the probabilistic learning process.
+\end{enumerate}
+
 \section{Conclusion}
+In this project, we developed a domain-informed Bayesian Network to predict obesity levels based on people's demographic, dietary, and lifestyle factors. Our model achieved an accuracy of 57.21\% on a 7-class classification problem, significantly outperforming random baseline (14.3\%) and demonstrating that probabilistic graphical models like Bayesian Network Inference can effectively capture dependencies between lifestyle behaviors and health outcomes such as obesity.
+
+Some key findings We've obtained from this project in modeling choices and results interpretations are following: \\
+First, putting BMI as an intermediate node between lifestyle factors and the final obesity class worked well in our practice. For starters this structure matches medical intuition, plus it also keeps the CPTs manageable without losing interpretability. We also observed that physical activity plays an important role in shaping prediction outcomes. In our what-if model quality analysis, increasing activity from low to high levels almost cut the predicted probability of Obesity Type I in half (from 13.6\% to 7.7\%), which suggests that the network is capturing a reasonable causal relationship. Finally, while the overall predictive accuracy is not very high, the Bayesian network offers more interpretability than other machine learning black-box models. Using the Bayesian network, we can trace how different behaviors influence the final prediction through the conditional probabilities, which is valuable in areas where transparency matters as much as performance.
+
+In terms of limitations, the primary limitation of our approach is the information loss from turning continuous features into discrete classes. This way allows us to trace the inference, but take away more detailed information that's needed to further differenciate between adjacent obesity classes. Moreover, our network structure assumes that all lifestyle factors influence obesity exclusively through BMI, which may oversimplify direct physiological pathways.
+
+Overall, our project demonstrates that Bayesian Networks are a valuable tool for health risk modeling. While more complex models might achieve higher accuracy, our approach provides transparent, more interpretable insights that could support clinical decision-making and health education interventions.
 
 \section{Reflections and Contributions}
+For future students who want to work on this topic, we have the following suggestions to improve on the limitations: First, instead of using manual binning on the continuous variables, we could use structure learning algorithms (like Hill Climbing with BIC scoring) to discover optimal bin boundaries and network topology directly from data, which may help fixing the information loss that leads to failed prediction in adjacent classes. Also, another approach to improve the accuracy could be to train multiple Bayesian Networks with different thresholds and schemes to turn continuous variables into discrete, then ensemble the prediction results from all those models to balance making the prediction interpretable while improving result's accuracy.
 
+Each of our team members contribute to this project and reflected on what we've learned through this project, the specifics are as follows:
+\begin{itemize}
+    \item Weiqi:
+    \item Feiyang:
+    \item Junhan:
+    \item Fanyuanhang:
+    \item Yiqian:
+\end{itemize}
+
+In this project, we utilized generative AI tools (ChatGPT) at various stages of this project, but all final decisions, implementations, and analyses were independently performed by our team. Specific uses are:
+\begin{itemize}
+    \item \textbf{Literature Review Support:} Used AI to summarize medical research papers on obesity risk factors, helping us identify which variables to include and how they causally relate.
+
+    \item \textbf{Code Debugging Assistance:} When encountering errors with pgmpy (e.g., NaN accuracy issues, discretization bugs), we consulted AI for debugging suggestions. However, we independently analyzed error messages, tested hypotheses, and implemented fixes.
+
+    \item \textbf{Writing Refinement:} Used AI to improve report clarity and fix grammatical errors. All technical content, experimental results, and interpretations were written by team members first, with AI only polishing language.
+
+    \item \textbf{NOT Used For:} AI did not design our network structure, choose discretization thresholds, interpret results, or write code from scratch. All core modeling decisions and implementations were made independently through team discussions and iterative experimentation.
+\end{itemize}
 
 
 \bibliographystyle{plainnat}
