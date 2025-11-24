@@ -37,6 +37,18 @@ def load_and_process_data(filepath):
     # Assuming FAF is 0-3 days/frequency
     df['FAF_bin'] = pd.cut(df['FAF'], bins=[-0.1, 1, 2, 4], labels=['Low', 'Medium', 'High'])
 
+    # FCVC (Vegetables) -> Round to integer (1, 2, 3)
+    df['FCVC'] = df['FCVC'].round().astype(int).astype(str)
+
+    # NCP (Meals per day) -> Round to integer (1, 2, 3, 4)
+    df['NCP'] = df['NCP'].round().astype(int).astype(str)
+
+    # TUE (Tech usage) -> Round to integer (0, 1, 2)
+    df['TUE'] = df['TUE'].round().astype(int).astype(str)
+
+    # CH2O (Water) -> Round to integer (1, 2, 3)
+    df['CH2O_bin'] = df['CH2O'].round().astype(int).astype(str)
+
     # Ensure all columns used in the BN are strings/categories (Discrete)
     cols_to_use = [
         'Gender', 'Age_bin', 'family_history',  # Demographics
@@ -64,8 +76,16 @@ def build_and_train_model(train_data):
 
         # 2. Lifestyle/Diet -> BMI_bin [cite: 39]
         ('FAVC', 'BMI_bin'),
+        ('FCVC', 'BMI_bin'),
         ('FAF_bin', 'BMI_bin'),
         ('SMOKE', 'BMI_bin'),
+        ('NCP', 'BMI_bin'),
+        ('CAEC', 'BMI_bin'),
+        # ('CH2O_bin', 'BMI_bin'),  # <--- Added Water Intake
+        ('FAF_bin', 'BMI_bin'),
+        ('TUE', 'BMI_bin'),
+        ('CALC', 'BMI_bin'),
+        ('MTRANS', 'BMI_bin'),
 
         # 3. BMI_bin -> Obesity (Target) [cite: 40, 81]
         ('BMI_bin', 'Obesity')
@@ -78,7 +98,7 @@ def build_and_train_model(train_data):
     model.fit(train_data, estimator=MaximumLikelihoodEstimator)
 
     # # Optional: Check if the model is valid (no cycles, everything connected)
-    # print(f"Model Check: {model.check_model()}")
+    print(f"Model Check: {model.check_model()}")
 
     return model
 
@@ -97,14 +117,24 @@ def evaluate_model(model, test_data):
     for i, row in test_data.iterrows():
         # Remove target from evidence
         evidence = row.drop('Obesity').to_dict()
+        count=0
+        total = len(test_data)
 
         # Compute P(Obesity | features) [cite: 48]
         # We query the 'Obesity' node given the evidence of other nodes
         try:
+            # Query the model
             result = inference.map_query(variables=['Obesity'], evidence=evidence, show_progress=False)
             y_pred.append(result['Obesity'])
-        except:
-            y_pred.append(None)  # Handle edge cases
+        except Exception as e:
+            # If it fails, print the FIRST error and stop, so you know what's wrong
+            print(f"Error on row {i}: {e}")
+            print(f"Evidence was: {evidence}")
+            return  # Stop execution so you can fix it
+
+        count += 1
+        if count % 100 == 0:
+            print(f"Processed {count}/{total} records...")
 
     # Calculate Metrics [cite: 89]
     # Filter out Nones if any failed
